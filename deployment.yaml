@@ -2,28 +2,28 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: kube-system
-  name: flannel-fixer-deployment
+  name: flannel-public-ip-setter
   labels:
-    app: flannel-fixer
+    app: flannel-public-ip-setter
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: flannel-fixer
+      app: flannel-public-ip-setter
   template:
     metadata:
       labels:
-        app: flannel-fixer
+        app: flannel-public-ip-setter
     spec:
-      serviceAccountName: flannel-fixer
+      serviceAccountName: flannel-ip-setter
       tolerations:
         - key: "node-role.kubernetes.io/master"
           operator: "Exists"
       containers:
-        - name: flannel-fixer
-          image: "alekcander/k3s-flannel-fixer:0.0.2"
+        - name: flannel-ip-setter
+          image: "janeczku/rke-flannel-public-ip:0.0.3"
           command:
-            - flannel-fixer
+            - flannel-ip-setter
           ports:
             - containerPort: 2112
               name: metrics
@@ -31,13 +31,13 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: flannel-fixer
+  name: flannel-ip-setter
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: flannel-fixer
+  name: flannel-ip-setter-cr
   namespace: kube-system
 rules:
   - apiGroups: [""] # "" indicates the core API group
@@ -48,12 +48,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   namespace: kube-system
-  name: flannel-fixer-role-binding
+  name: flannel-ip-setter-crb
 roleRef:
   kind: ClusterRole
-  name: flannel-fixer
+  name: flannel-ip-setter-cr
   apiGroup: rbac.authorization.k8s.io
 subjects:
   - kind: ServiceAccount
-    name: flannel-fixer
+    name: flannel-ip-setter
     namespace: kube-system
