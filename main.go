@@ -27,9 +27,9 @@ import (
 
 var clientset *kubernetes.Clientset
 
-const externalIPLabel = "k3s.io/external-ip"
-const flannelPublicIPOverrideLabel = "flannel.alpha.coreos.com/public-ip-overwrite"
-const flannelPublicIPLabel = "flannel.alpha.coreos.com/public-ip"
+const rkeExternalIPAnnotation = "rke.cattle.io/external-ip"
+const flannelPublicIPOverrideAnnotation = "flannel.alpha.coreos.com/public-ip-overwrite"
+const flannelPublicIPAnnotation = "flannel.alpha.coreos.com/public-ip"
 
 func bootstrap() {
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
@@ -115,6 +115,8 @@ func main() {
 
 func updateNode(node *coreV1.Node) {
 	publicIP := ""
+	// The externalIP status information is typically only available if a cloud provider
+	// controller is enabled in the cluster, e.g. Openstack Cloud Provider
 	for _, nodeAddress := range node.Status.Addresses {
 		if nodeAddress.Type == coreV1.NodeExternalIP {
 			publicIP = nodeAddress.Address
@@ -124,18 +126,18 @@ func updateNode(node *coreV1.Node) {
 	logEntry := log.Info().Str("node_name", node.Name)
 
 	if publicIP == "" {
-		//fallback on k3s label
+		//fallback on RKE annotation
 		var ok bool
-		publicIP, ok = node.Labels[externalIPLabel]
+		publicIP, ok = node.Annotations[rkeExternalIPAnnotation]
 		if !ok {
-			logEntry.Msg(fmt.Sprintf("node doesn't have public address or %s label, skipping", externalIPLabel))
+			logEntry.Msg(fmt.Sprintf("node doesn't have public address or %s a annotation, skipping", rkeExternalIPAnnotation))
 			return
 		}
 	}
 	logEntry.Str("public_ip", publicIP)
 
-	flannelPublicIP := getValueFromMap(flannelPublicIPLabel, node.Annotations)
-	flannelPublicIPOverride := getValueFromMap(flannelPublicIPOverrideLabel, node.Annotations)
+	flannelPublicIP := getValueFromMap(flannelPublicIPAnnotation, node.Annotations)
+	flannelPublicIPOverride := getValueFromMap(flannelPublicIPOverrideAnnotation, node.Annotations)
 	logEntry.Str("public_ip", publicIP).
 		Str("old_flannel_public_ip", flannelPublicIP).
 		Str("old_flannel_public_ip_override", flannelPublicIPOverride)
@@ -145,8 +147,8 @@ func updateNode(node *coreV1.Node) {
 	}
 
 	//set new values
-	node.Annotations[flannelPublicIPLabel] = publicIP
-	node.Annotations[flannelPublicIPOverrideLabel] = publicIP
+	node.Annotations[flannelPublicIPAnnotation] = publicIP
+	node.Annotations[flannelPublicIPOverrideAnnotation] = publicIP
 	logEntry.Str("new_flannel_public_ip", publicIP).
 		Str("new_flannel_public_ip_override", publicIP)
 
